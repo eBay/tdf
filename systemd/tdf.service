@@ -1,0 +1,21 @@
+[Unit]
+Description=Transparent DNS Forwarder
+Documentation=https://github.com/ebay/tdf
+Wants=network-online.target pdns-recursor.service
+After=pdns-recursor.service
+
+[Service]
+ExecStart=/bin/bash -c "tdf -s $(ip route get $(getent hosts www.ebay.com | awk '{ print $1 }') | head -1 | awk '{ print $7 }') -c $(stat -tf /sys/fs/cgroup | awk '{ if($4==63677270) { print $1 } }')"
+User=root
+Group=root
+Type=notify
+Restart=on-failure
+StartLimitInterval=5
+RuntimeDirectory=tdf
+SyslogIdentifier=tdf
+LimitSTACK=infinity
+KillMode=process
+Type=exec
+
+[Install]
+WantedBy=multi-user.target

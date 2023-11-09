@@ -1,0 +1,23 @@
+[Unit]
+Description=Transparent DNS Forwarder
+Documentation=https://github.com/ebay/tdf
+Wants=network-online.target pdns-recursor.service
+After=pdns-recursor.service
+
+[Service]
+ExecStart=/bin/bash -c "tdf -s $(ip route get $(getent hosts www.ebay.com | awk '{ print $1 }') | head -1 | awk '{ print $7 }') -i 192.168.0.10"
+ExecStartPost=/bin/bash -c "echo Attaching tdf to cgroup2 fs; sleep 2 ; sendtag=\"$(tdf-bpftool prog | grep tdf_sendmsg | awk '{ print $6 }')\"; recvtag=\"$(tdf-bpftool prog | grep tdf_recvmsg | awk '{ print $6 }')\"; conntag=\"$(tdf-bpftool prog | grep tdf_connect | awk '{ print $6 }')\"; cgroupfs=\"$(stat -tf /sys/fs/cgroup | awk '{ if($4==1021994) { print $1 } }')\" ; tdf-bpftool cgroup attach $cgroupfs sendmsg4 tag $sendtag ; tdf-bpftool cgroup attach $cgroupfs recvmsg4 tag $recvtag ; tdf-bpftool cgroup attach $cgroupfs connect4 tag $conntag; echo Finished attaching tdf to cgroup2 fs"
+ExecStopPost=-/bin/bash -c "echo Detaching tdf from cgroup2 fs; sendtag=\"$(tdf-bpftool prog | grep tdf_sendmsg | awk '{ print $6 }')\"; recvtag=\"$(tdf-bpftool prog | grep tdf_recvmsg | awk '{ print $6 }')\"; conntag=\"$(tdf-bpftool prog | grep tdf_connect | awk '{ print $6 }')\"; cgroupfs=\"$(stat -tf /sys/fs/cgroup | awk '{ if($4==1021994) { print $1 } }')\" ; tdf-bpftool cgroup detach $cgroupfs sendmsg4 tag $sendtag ; tdf-bpftool cgroup detach $cgroupfs recvmsg4 tag $recvtag ; tdf-bpftool cgroup detach $cgroupfs connect4 tag $conntag; echo Finished detaching tdf from cgroup2 fs"
+User=root
+Group=root
+Type=notify
+Restart=on-failure
+StartLimitInterval=5
+RuntimeDirectory=tdf
+SyslogIdentifier=tdf
+LimitSTACK=infinity
+KillMode=process
+Type=exec
+
+[Install]
+WantedBy=multi-user.target
